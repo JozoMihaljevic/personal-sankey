@@ -67,6 +67,7 @@ function App() {
           alert('Invalid data format');
         }
       } catch (error) {
+        console.log(error);
         alert('Error reading file');
       }
     };

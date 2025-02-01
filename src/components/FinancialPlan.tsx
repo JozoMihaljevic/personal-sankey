@@ -7,7 +7,7 @@ interface FinancialPlanProps {
   onUpdate: (data: FinanceData) => void;
 }
 
-export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) => {
+export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data }) => {
   const totalIncome = data.incomeSources.reduce((sum, source) => sum + source.amount, 0);
 
   const columnLimits = {
@@ -28,17 +28,13 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
     Unallocated: data.spendingCategories.sort((a, b) => b.amount - a.amount),
   });
 
-  const onDragStart = (start) => {
-    console.log("Dragging ID:", start.draggableId);
-  };
-
   const columnTotals = {
     "75%": columns["75%"].reduce((sum, cat) => sum + cat.amount, 0),
     "15%": columns["15%"].reduce((sum, cat) => sum + cat.amount, 0),
     "10%": columns["10%"].reduce((sum, cat) => sum + cat.amount, 0),
   };
 
-  const handleDragEnd = (result: any) => {
+  const handleDragEnd = (result) => {
     if (!result.destination) return;
 
     const sourceColumn = result.source.droppableId as keyof typeof columns;
@@ -60,14 +56,15 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
   };
 
   return (
-    <div className="bg-white p-6 rounded-md shadow-md">
-      <h2 className="text-xl font-bold mb-4">Financial Plan</h2>
-      <div className="mb-6">
-        <p>Total Income: <strong>${totalIncome.toFixed(2)}</strong></p>
+    <div className="bg-white p-6 rounded-lg shadow-md mx-auto">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">Financial Plan</h2>
+
+      <div className="mb-6 text-center">
+        <p className="text-lg text-gray-700">Total Income: <strong className="text-green-600">${totalIncome.toFixed(2)}</strong></p>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {["75%", "15%", "10%", "Unallocated"].map((columnId) => {
             const isPercentageColumn = columnId !== "Unallocated";
             const total = columnTotals[columnId as keyof typeof columnTotals] || 0;
@@ -76,17 +73,21 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
             const isOver = difference < 0;
 
             return (
-              <div key={columnId} className="bg-gray-50 p-4 border rounded-md">
-                <h3 className="text-lg font-semibold mb-2">
+              <div
+                key={columnId}
+                className={`p-4 border rounded-lg shadow-md bg-white transition-all 
+                ${isOver ? "border-red-500 bg-red-50" : "border-gray-200 hover:shadow-lg"}`
+                }>
+                <h3 className="text-lg font-semibold mb-2 text-gray-800 text-center">
                   {columnId === "Unallocated" ? "Unallocated Categories" : `${columnId} of Expenses`}
                 </h3>
 
                 {isPercentageColumn && (
                   <>
-                    <p className="text-sm mb-2">
-                      Max Allowed: <strong>${maxLimit.toFixed(2)}</strong>
+                    <p className="text-sm text-gray-600 mb-1">
+                      Max Allowed: <strong className="text-gray-800">${maxLimit.toFixed(2)}</strong>
                     </p>
-                    <p className={`text-sm mb-4 font-bold ${isOver ? "text-red-600" : "text-green-600"}`}>
+                    <p className={`text-sm font-bold mb-2 ${isOver ? "text-red-600" : "text-green-600"}`}>
                       Current Total: <strong>${total.toFixed(2)}</strong>
                     </p>
                     <p className={`text-sm font-semibold ${isOver ? "text-red-600" : "text-green-600"}`}>
@@ -100,7 +101,7 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className="space-y-2 min-h-[100px] bg-white p-2 rounded shadow-sm"
+                      className="min-h-[120px] bg-gray-50 p-3 rounded-lg shadow-inner"
                     >
                       {columns[columnId as keyof typeof columns].map((category, index) => (
                         <Draggable key={category.id} draggableId={category.id} index={index}>
@@ -109,10 +110,10 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
                               ref={provided.innerRef}
                               {...provided.draggableProps}
                               {...provided.dragHandleProps}
-                              className="bg-white p-4 border rounded-md shadow-sm flex justify-between items-center"
+                              className="bg-white p-3 border rounded-md shadow-sm flex justify-between items-center mb-2 transition hover:shadow-md"
                             >
-                              <span>{category.name}</span>
-                              <span>${category.amount.toFixed(2)}</span>
+                              <span className="text-gray-800 font-medium">{category.name}</span>
+                              <span className="text-gray-700">${category.amount.toFixed(2)}</span>
                             </div>
                           )}
                         </Draggable>
