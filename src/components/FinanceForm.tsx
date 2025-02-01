@@ -40,30 +40,27 @@ export const FinanceForm: React.FC<FinanceFormProps> = ({ data, onUpdate }) => {
           ? {
             ...category,
             subCategories: [...category.subCategories, newSubCategory],
-            amount: category.subCategories.reduce((sum, sub) => sum + sub.amount, 0) // Update category total
+            amount: category.subCategories.reduce((sum, sub) => sum + sub.amount, 0)
           }
           : category
-      )
+      ).sort((a, b) => a.id.localeCompare(b.id)) // Ensures categories remain in order
     });
   };
 
   const updateSubCategory = (categoryId: string, subCategoryId: string, field: keyof SubCategory, value: string | number) => {
-    const category = data.spendingCategories.find(c => c.id === categoryId);
-    if (!category) return;
-
-    const updatedSubCategories = category.subCategories.map(sub =>
-      sub.id === subCategoryId
-        ? { ...sub, [field]: value }
-        : sub
-    );
-
-    const updatedAmount = updatedSubCategories.reduce((sum, sub) => sum + sub.amount, 0); // Recalculate the total for the category
-
     onUpdate({
       ...data,
       spendingCategories: data.spendingCategories.map(category =>
         category.id === categoryId
-          ? { ...category, subCategories: updatedSubCategories, amount: updatedAmount } // Update category total amount
+          ? {
+            ...category,
+            subCategories: category.subCategories.map(sub =>
+              sub.id === subCategoryId ? { ...sub, [field]: value } : sub
+            ),
+            amount: category.subCategories.reduce((sum, sub) =>
+              sub.id === subCategoryId ? sum + (typeof value === 'number' ? value : sub.amount) : sum + sub.amount, 0
+            ) // Ensure amount updates correctly
+          }
           : category
       )
     });

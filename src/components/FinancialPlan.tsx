@@ -10,14 +10,12 @@ interface FinancialPlanProps {
 export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) => {
   const totalIncome = data.incomeSources.reduce((sum, source) => sum + source.amount, 0);
 
-  // Define spending limits for each column
   const columnLimits = {
     "75%": totalIncome * 0.75,
     "15%": totalIncome * 0.15,
     "10%": totalIncome * 0.10,
   };
 
-  // ** State: Track categories in columns **
   const [columns, setColumns] = useState<{
     "75%": SpendingCategory[];
     "15%": SpendingCategory[];
@@ -27,10 +25,13 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
     "75%": [],
     "15%": [],
     "10%": [],
-    Unallocated: data.spendingCategories.sort((a, b) => b.amount - a.amount), // Sorted by descending order
+    Unallocated: data.spendingCategories.sort((a, b) => b.amount - a.amount),
   });
 
-  // Compute current totals for each column
+  const onDragStart = (start) => {
+    console.log("Dragging ID:", start.draggableId);
+  };
+
   const columnTotals = {
     "75%": columns["75%"].reduce((sum, cat) => sum + cat.amount, 0),
     "15%": columns["15%"].reduce((sum, cat) => sum + cat.amount, 0),
@@ -43,33 +44,18 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
     const sourceColumn = result.source.droppableId as keyof typeof columns;
     const destColumn = result.destination.droppableId as keyof typeof columns;
 
-    if (sourceColumn === destColumn) return; // Prevent unnecessary state updates
+    if (sourceColumn === destColumn) return;
 
     const sourceItems = [...columns[sourceColumn]];
     const destItems = [...columns[destColumn]];
     const [movedItem] = sourceItems.splice(result.source.index, 1);
 
-    // Adjust amount when moved to a percentage-based column
-    let newAmount = movedItem.amount;
-    if (destColumn !== "Unallocated") {
-      const availableSpace = columnLimits[destColumn] - columnTotals[destColumn];
-      newAmount = Math.min(movedItem.amount, availableSpace); // Prevent over-allocation
-    }
-
-    const updatedItem = { ...movedItem, amount: newAmount };
-
-    destItems.splice(result.destination.index, 0, updatedItem);
+    destItems.splice(result.destination.index, 0, movedItem);
 
     setColumns({
       ...columns,
       [sourceColumn]: sourceItems,
       [destColumn]: destItems,
-    });
-
-    // Update parent state
-    onUpdate({
-      ...data,
-      spendingCategories: [...sourceItems, ...destItems],
     });
   };
 
@@ -82,51 +68,62 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-4 gap-4">
-          {["75%", "15%", "10%", "Unallocated"].map((columnId) => (
-            <div key={columnId} className="bg-gray-50 p-4 border rounded-md">
-              <h3 className="text-lg font-semibold mb-2">
-                {columnId === "Unallocated" ? "Unallocated Categories" : `${columnId} of Expenses`}
-              </h3>
+          {["75%", "15%", "10%", "Unallocated"].map((columnId) => {
+            const isPercentageColumn = columnId !== "Unallocated";
+            const total = columnTotals[columnId as keyof typeof columnTotals] || 0;
+            const maxLimit = columnLimits[columnId as keyof typeof columnLimits] || 0;
+            const difference = maxLimit - total;
+            const isOver = difference < 0;
 
-              {columnId !== "Unallocated" && (
-                <>
-                  <p className="text-sm mb-2">
-                    Max Allowed: <strong>${columnLimits[columnId as keyof typeof columnLimits].toFixed(2)}</strong>
-                  </p>
-                  <p className="text-sm mb-4">
-                    Current Total: <strong>${columnTotals[columnId as keyof typeof columnTotals].toFixed(2)}</strong>
-                  </p>
-                </>
-              )}
+            return (
+              <div key={columnId} className="bg-gray-50 p-4 border rounded-md">
+                <h3 className="text-lg font-semibold mb-2">
+                  {columnId === "Unallocated" ? "Unallocated Categories" : `${columnId} of Expenses`}
+                </h3>
 
-              <Droppable droppableId={columnId}>
-                {(provided) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                    className="space-y-2 min-h-[100px] bg-white p-2 rounded shadow-sm"
-                  >
-                    {columns[columnId as keyof typeof columns].map((category, index) => (
-                      <Draggable key={category.id} draggableId={category.id} index={index}>
-                        {(provided) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            className="bg-white p-4 border rounded-md shadow-sm flex justify-between items-center"
-                          >
-                            <span>{category.name}</span>
-                            <span>${category.amount.toFixed(2)}</span>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
+                {isPercentageColumn && (
+                  <>
+                    <p className="text-sm mb-2">
+                      Max Allowed: <strong>${maxLimit.toFixed(2)}</strong>
+                    </p>
+                    <p className={`text-sm mb-4 font-bold ${isOver ? "text-red-600" : "text-green-600"}`}>
+                      Current Total: <strong>${total.toFixed(2)}</strong>
+                    </p>
+                    <p className={`text-sm font-semibold ${isOver ? "text-red-600" : "text-green-600"}`}>
+                      {isOver ? `Over by $${Math.abs(difference).toFixed(2)}` : `Under by $${difference.toFixed(2)}`}
+                    </p>
+                  </>
                 )}
-              </Droppable>
-            </div>
-          ))}
+
+                <Droppable droppableId={columnId}>
+                  {(provided) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className="space-y-2 min-h-[100px] bg-white p-2 rounded shadow-sm"
+                    >
+                      {columns[columnId as keyof typeof columns].map((category, index) => (
+                        <Draggable key={category.id} draggableId={category.id} index={index}>
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              className="bg-white p-4 border rounded-md shadow-sm flex justify-between items-center"
+                            >
+                              <span>{category.name}</span>
+                              <span>${category.amount.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
         </div>
       </DragDropContext>
     </div>
