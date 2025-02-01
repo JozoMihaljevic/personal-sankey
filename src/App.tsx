@@ -3,20 +3,41 @@ import { FinanceForm } from './components/FinanceForm';
 import { SankeyChart } from './components/SankeyChart';
 import { FinanceData } from './types';
 import { sampleData } from './sampleData';
-import { BarChart, Download, Upload } from 'lucide-react';
+import { BarChart, Download, Upload, Database } from 'lucide-react';
 import FinancialPlan from "./components/FinancialPlan.tsx";
+import { db } from './firebaseConfig';
+import { doc, setDoc, getDoc } from "firebase/firestore";
+
+const FIRESTORE_DOC_ID = "BucCe7Nx9zTYbcnIR7Uf"; // 🔹 Your specific Firestore document ID
+const COLLECTION_NAME = "financeData"; // 🔹 Your Firestore collection
 
 function App() {
-  const [data, setData] = useState<FinanceData>(() => {
-    const savedData = localStorage.getItem('financeData');
-    return savedData ? JSON.parse(savedData) : sampleData;
-  });
+  const [data, setData] = useState<FinanceData | null>(null);
 
+  // Load data from Firestore on app start
   useEffect(() => {
-    localStorage.setItem('financeData', JSON.stringify(data));
-  }, [data]);
+    const loadDataFromFirestore = async () => {
+      try {
+        const docRef = doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setData(docSnap.data() as FinanceData);
+        } else {
+          console.warn("Document not found. Creating with sample data...");
+          await setDoc(docRef, sampleData);
+          setData(sampleData);
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+      }
+    };
+
+    loadDataFromFirestore();
+  }, []);
 
   const handleExport = () => {
+    if (!data) return;
     const dataStr = JSON.stringify(data, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -43,6 +64,7 @@ function App() {
           Array.isArray(importedData.spendingCategories)
         ) {
           setData(importedData);
+          saveDataToFirestore(importedData);
         } else {
           alert('Invalid data format');
         }
@@ -53,6 +75,17 @@ function App() {
     reader.readAsText(file);
     event.target.value = '';
   };
+
+  const saveDataToFirestore = async (updatedData: FinanceData) => {
+    try {
+      await setDoc(doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID), updatedData, { merge: true });
+      console.log("Data successfully updated in Firestore.");
+    } catch (error) {
+      console.error("Error saving data:", error);
+    }
+  };
+
+  if (!data) return <p className="text-center mt-10">Loading data...</p>;
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -81,6 +114,13 @@ function App() {
                   className="hidden"
                 />
               </label>
+              <button
+                onClick={() => saveDataToFirestore(data)}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors text-sm sm:text-base"
+              >
+                <Database size={20} />
+                <span>Save to Firestore</span>
+              </button>
             </div>
           </div>
         </div>
@@ -89,13 +129,13 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 py-6 sm:py-8">
         <div className="flex flex-col gap-8">
           <div>
-            <FinanceForm data={data} onUpdate={setData}/>
+            <FinanceForm data={data} onUpdate={setData} />
           </div>
           <div>
-            <SankeyChart data={data}/>
+            <SankeyChart data={data} />
           </div>
           <div>
-            <FinancialPlan data={data}/> {/* New Component */}
+            <FinancialPlan data={data} />
           </div>
         </div>
       </main>

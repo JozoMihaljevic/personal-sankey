@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "chroma-js": "^3.1.2",
+    "firebase": "^11.2.0",
     "highcharts": "^11.3.0",
     "highcharts-react-official": "^3.2.1",
     "highcharts-sankey": "^0.1.7",
