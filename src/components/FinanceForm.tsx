@@ -25,6 +25,67 @@ export const FinanceForm: React.FC<FinanceFormProps> = ({ data, onUpdate }) => {
     });
   };
 
+  const addSubCategory = (categoryId: string) => {
+    const newSubCategory: SubCategory = {
+      id: Date.now().toString(),
+      label: '',
+      name: '',
+      amount: 0
+    };
+
+    onUpdate({
+      ...data,
+      spendingCategories: data.spendingCategories.map(category =>
+        category.id === categoryId
+          ? {
+            ...category,
+            subCategories: [...category.subCategories, newSubCategory],
+            amount: category.subCategories.reduce((sum, sub) => sum + sub.amount, 0) // Update category total
+          }
+          : category
+      )
+    });
+  };
+
+  const updateSubCategory = (categoryId: string, subCategoryId: string, field: keyof SubCategory, value: string | number) => {
+    const category = data.spendingCategories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const updatedSubCategories = category.subCategories.map(sub =>
+      sub.id === subCategoryId
+        ? { ...sub, [field]: value }
+        : sub
+    );
+
+    const updatedAmount = updatedSubCategories.reduce((sum, sub) => sum + sub.amount, 0); // Recalculate the total for the category
+
+    onUpdate({
+      ...data,
+      spendingCategories: data.spendingCategories.map(category =>
+        category.id === categoryId
+          ? { ...category, subCategories: updatedSubCategories, amount: updatedAmount } // Update category total amount
+          : category
+      )
+    });
+  };
+
+  const removeSubCategory = (categoryId: string, subCategoryId: string) => {
+    const category = data.spendingCategories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const updatedSubCategories = category.subCategories.filter(sub => sub.id !== subCategoryId);
+    const updatedAmount = updatedSubCategories.reduce((sum, sub) => sum + sub.amount, 0); // Recalculate the total for the category
+
+    onUpdate({
+      ...data,
+      spendingCategories: data.spendingCategories.map(category =>
+        category.id === categoryId
+          ? { ...category, subCategories: updatedSubCategories, amount: updatedAmount } // Update category total amount
+          : category
+      )
+    });
+  };
+
   const addSpendingCategory = () => {
     const newCategory: SpendingCategory = {
       id: Date.now().toString(),
@@ -36,26 +97,6 @@ export const FinanceForm: React.FC<FinanceFormProps> = ({ data, onUpdate }) => {
     onUpdate({
       ...data,
       spendingCategories: [...data.spendingCategories, newCategory]
-    });
-  };
-
-  const addSubCategory = (categoryId: string) => {
-    const newSubCategory: SubCategory = {
-      id: Date.now().toString(),
-      label: '',
-      name: '',
-      amount: 0
-    };
-    onUpdate({
-      ...data,
-      spendingCategories: data.spendingCategories.map(category =>
-        category.id === categoryId
-          ? {
-              ...category,
-              subCategories: [...category.subCategories, newSubCategory]
-            }
-          : category
-      )
     });
   };
 
@@ -86,46 +127,6 @@ export const FinanceForm: React.FC<FinanceFormProps> = ({ data, onUpdate }) => {
     });
   };
 
-  const updateSubCategory = (categoryId: string, subCategoryId: string, field: keyof SubCategory, value: string | number) => {
-    const category = data.spendingCategories.find(c => c.id === categoryId);
-    if (!category) return;
-
-    // Calculate the new total spending if this update is applied
-    const currentSubTotal = category.subCategories.reduce((sum, sub) => sum + sub.amount, 0);
-    const targetSubCategory = category.subCategories.find(sub => sub.id === subCategoryId);
-    if (!targetSubCategory) return;
-
-    // Determine the new amount and label/name value
-    const newAmount = field === 'amount' ? Number(value) : targetSubCategory.amount;
-    const newLabelAndName = field === 'name' || field === 'label' ? String(value) : targetSubCategory.name; // Set label and name together
-
-    const newSubTotal = currentSubTotal - targetSubCategory.amount + newAmount;
-    const otherCategoriesTotal = totalSpending - currentSubTotal;
-
-    // Check if the new amount would exceed total income
-    if (field === 'amount' && (otherCategoriesTotal + newSubTotal > totalIncome)) {
-      return; // Don't update if it would exceed total income
-    }
-
-    const updatedSpendingCategories = data.spendingCategories.map(category =>
-      category.id === categoryId
-        ? {
-          ...category,
-          subCategories: category.subCategories.map(sub =>
-            sub.id === subCategoryId
-              ? { ...sub, [field]: value, label: newLabelAndName, name: newLabelAndName } // Update both label and name
-              : sub
-          )
-        }
-        : category
-    );
-
-    onUpdate({
-      ...data,
-      spendingCategories: updatedSpendingCategories
-    });
-  };
-
   const removeIncomeSource = (id: string) => {
     onUpdate({
       ...data,
@@ -137,20 +138,6 @@ export const FinanceForm: React.FC<FinanceFormProps> = ({ data, onUpdate }) => {
     onUpdate({
       ...data,
       spendingCategories: data.spendingCategories.filter(category => category.id !== id)
-    });
-  };
-
-  const removeSubCategory = (categoryId: string, subCategoryId: string) => {
-    onUpdate({
-      ...data,
-      spendingCategories: data.spendingCategories.map(category =>
-        category.id === categoryId
-          ? {
-              ...category,
-              subCategories: category.subCategories.filter(sub => sub.id !== subCategoryId)
-            }
-          : category
-      )
     });
   };
 

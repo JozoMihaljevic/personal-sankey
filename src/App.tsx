@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { FinanceForm } from './components/FinanceForm';
 import { SankeyChart } from './components/SankeyChart';
 import { FinanceData } from './types';
-import { sampleData } from './sampleData';
 import { BarChart, Download, Upload, Database } from 'lucide-react';
 import FinancialPlan from "./components/FinancialPlan.tsx";
 import { db } from './firebaseConfig';
@@ -23,10 +22,9 @@ function App() {
 
         if (docSnap.exists()) {
           setData(docSnap.data() as FinanceData);
+          console.log(docSnap.data());
         } else {
-          console.warn("Document not found. Creating with sample data...");
-          await setDoc(docRef, sampleData);
-          setData(sampleData);
+          console.warn("Document not found");
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -78,8 +76,9 @@ function App() {
 
   const saveDataToFirestore = async (updatedData: FinanceData) => {
     try {
-      await setDoc(doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID), updatedData, { merge: true });
+      await setDoc(doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID), updatedData, { merge: false });
       console.log("Data successfully updated in Firestore.");
+      console.log(updatedData);
     } catch (error) {
       console.error("Error saving data:", error);
     }

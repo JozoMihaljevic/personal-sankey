@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { FinanceData, SpendingCategory } from "../types";
 
@@ -10,22 +10,27 @@ interface FinancialPlanProps {
 export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) => {
   const totalIncome = data.incomeSources.reduce((sum, source) => sum + source.amount, 0);
 
-  // Column limits based on total income
+  // Define spending limits for each column
   const columnLimits = {
     "75%": totalIncome * 0.75,
     "15%": totalIncome * 0.15,
     "10%": totalIncome * 0.10,
   };
 
-  // Filter categories into columns based on percentage or unallocated
-  const columns = {
-    "75%": data.spendingCategories.filter((cat) => cat.percentage === 75),
-    "15%": data.spendingCategories.filter((cat) => cat.percentage === 15),
-    "10%": data.spendingCategories.filter((cat) => cat.percentage === 10),
-    Unallocated: data.spendingCategories.filter((cat) => !cat.percentage),
-  };
+  // ** State: Track categories in columns **
+  const [columns, setColumns] = useState<{
+    "75%": SpendingCategory[];
+    "15%": SpendingCategory[];
+    "10%": SpendingCategory[];
+    Unallocated: SpendingCategory[];
+  }>({
+    "75%": [],
+    "15%": [],
+    "10%": [],
+    Unallocated: data.spendingCategories.sort((a, b) => b.amount - a.amount), // Sorted by descending order
+  });
 
-  // Calculate current totals for each column
+  // Compute current totals for each column
   const columnTotals = {
     "75%": columns["75%"].reduce((sum, cat) => sum + cat.amount, 0),
     "15%": columns["15%"].reduce((sum, cat) => sum + cat.amount, 0),
@@ -35,43 +40,49 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
   const handleDragEnd = (result: any) => {
     if (!result.destination) return;
 
-    const sourceColumn = result.source.droppableId;
-    const destColumn = result.destination.droppableId;
+    const sourceColumn = result.source.droppableId as keyof typeof columns;
+    const destColumn = result.destination.droppableId as keyof typeof columns;
 
-    const sourceItems = Array.from(columns[sourceColumn as keyof typeof columns]);
-    const destItems = Array.from(columns[destColumn as keyof typeof columns]);
+    if (sourceColumn === destColumn) return; // Prevent unnecessary state updates
 
+    const sourceItems = [...columns[sourceColumn]];
+    const destItems = [...columns[destColumn]];
     const [movedItem] = sourceItems.splice(result.source.index, 1);
 
-    // Update the category's percentage if it's moved to a specific column
-    movedItem.percentage = destColumn === "Unallocated" ? undefined : parseInt(destColumn.replace("%", ""));
+    // Adjust amount when moved to a percentage-based column
+    let newAmount = movedItem.amount;
+    if (destColumn !== "Unallocated") {
+      const availableSpace = columnLimits[destColumn] - columnTotals[destColumn];
+      newAmount = Math.min(movedItem.amount, availableSpace); // Prevent over-allocation
+    }
 
-    destItems.splice(result.destination.index, 0, movedItem);
+    const updatedItem = { ...movedItem, amount: newAmount };
 
-    // Combine all updated categories back into the main list
-    const updatedCategories: SpendingCategory[] = [
-      ...Object.keys(columns).flatMap((key) => {
-        if (key === sourceColumn || key === destColumn) return [];
-        return columns[key as keyof typeof columns];
-      }),
-      ...sourceItems,
-      ...destItems,
-    ];
+    destItems.splice(result.destination.index, 0, updatedItem);
 
-    onUpdate({ ...data, spendingCategories: updatedCategories });
+    setColumns({
+      ...columns,
+      [sourceColumn]: sourceItems,
+      [destColumn]: destItems,
+    });
+
+    // Update parent state
+    onUpdate({
+      ...data,
+      spendingCategories: [...sourceItems, ...destItems],
+    });
   };
 
   return (
     <div className="bg-white p-6 rounded-md shadow-md">
       <h2 className="text-xl font-bold mb-4">Financial Plan</h2>
-
       <div className="mb-6">
         <p>Total Income: <strong>${totalIncome.toFixed(2)}</strong></p>
       </div>
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-4 gap-4">
-          {Object.keys(columns).map((columnId) => (
+          {["75%", "15%", "10%", "Unallocated"].map((columnId) => (
             <div key={columnId} className="bg-gray-50 p-4 border rounded-md">
               <h3 className="text-lg font-semibold mb-2">
                 {columnId === "Unallocated" ? "Unallocated Categories" : `${columnId} of Expenses`}
@@ -96,11 +107,7 @@ export const FinancialPlan: React.FC<FinancialPlanProps> = ({ data, onUpdate }) 
                     className="space-y-2 min-h-[100px] bg-white p-2 rounded shadow-sm"
                   >
                     {columns[columnId as keyof typeof columns].map((category, index) => (
-                      <Draggable
-                        key={category.name}
-                        draggableId={category.name}
-                        index={index}
-                      >
+                      <Draggable key={category.id} draggableId={category.id} index={index}>
                         {(provided) => (
                           <div
                             ref={provided.innerRef}
