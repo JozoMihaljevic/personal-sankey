@@ -2,37 +2,58 @@ import React, { useState, useEffect } from 'react';
 import { FinanceForm } from './components/FinanceForm';
 import { SankeyChart } from './components/SankeyChart';
 import { FinanceData } from './types';
-import { BarChart, Download, Upload, Database } from 'lucide-react';
+import { BarChart, Download, Upload, Database, LogOut } from 'lucide-react';
 import FinancialPlan from "./components/FinancialPlan.tsx";
-import { db } from './firebaseConfig';
+import { db, auth } from './firebaseConfig';
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import LoginPage from './components/LoginPage';
 
-const FIRESTORE_DOC_ID = "BucCe7Nx9zTYbcnIR7Uf"; // 🔹 Your specific Firestore document ID
-const COLLECTION_NAME = "financeData"; // 🔹 Your Firestore collection
+const FIRESTORE_DOC_ID = "BucCe7Nx9zTYbcnIR7Uf";
+const COLLECTION_NAME = "financeData";
 
 function App() {
   const [data, setData] = useState<FinanceData | null>(null);
+  const [user, setUser] = useState(auth.currentUser);
+  const [loading, setLoading] = useState(true);
 
-  // Load data from Firestore on app start
   useEffect(() => {
-    const loadDataFromFirestore = async () => {
-      try {
-        const docRef = doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID);
-        const docSnap = await getDoc(docRef);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
 
-        if (docSnap.exists()) {
-          setData(docSnap.data() as FinanceData);
-          console.log(docSnap.data());
-        } else {
-          console.warn("Document not found");
-        }
-      } catch (error) {
-        console.error("Error loading data:", error);
-      }
-    };
-
-    loadDataFromFirestore();
+    return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const loadDataFromFirestore = async () => {
+        try {
+          const docRef = doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            setData(docSnap.data() as FinanceData);
+          } else {
+            console.warn("Document not found");
+          }
+        } catch (error) {
+          console.error("Error loading data:", error);
+        }
+      };
+
+      loadDataFromFirestore();
+    }
+  }, [user]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const handleExport = () => {
     if (!data) return;
@@ -79,11 +100,18 @@ function App() {
     try {
       await setDoc(doc(db, COLLECTION_NAME, FIRESTORE_DOC_ID), updatedData, { merge: false });
       console.log("Data successfully updated in Firestore.");
-      console.log(updatedData);
     } catch (error) {
       console.error("Error saving data:", error);
     }
   };
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+  }
+
+  if (!user) {
+    return <LoginPage />;
+  }
 
   if (!data) return <p className="text-center mt-10">Loading data...</p>;
 
@@ -120,6 +148,13 @@ function App() {
               >
                 <Database size={20} />
                 <span>Save to Firestore</span>
+              </button>
+              <button
+                onClick={handleSignOut}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-sm sm:text-base"
+              >
+                <LogOut size={20} />
+                <span>Sign Out</span>
               </button>
             </div>
           </div>
